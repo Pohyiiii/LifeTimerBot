@@ -83,15 +83,15 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running"
+    return "Bot is running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# Запуск Flask в отдельном потоке
+def run_bot():
+    bot.polling(none_stop=True, interval=0)
+
 threading.Thread(target=run_flask).start()
 
-# Твой бот ниже
-bot.polling(none_stop=True)
-
+run_bot()
