@@ -27,12 +27,12 @@ def generate_life_weeks_image(birth_date, current_date):
     draw = ImageDraw.Draw(img)
 
     # Шрифт
-    try:
-        font = ImageFont.truetype("arial.ttf", 14)
-        title_font = ImageFont.truetype("arial.ttf", 18)
-    except:
-        font = ImageFont.load_default()
-        title_font = ImageFont.load_default()
+try:
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+    title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+except:
+    font = ImageFont.load_default()
+    title_font = ImageFont.load_default()
 
     # Заголовок
     text = f"Прожито: {lived_weeks} недель ({lived_days} дней)"

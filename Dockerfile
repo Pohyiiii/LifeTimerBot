@@ -1,9 +1,9 @@
 # Используем официальный образ Python
 FROM python:3.11-slim
 
-# Устанавливаем зависимости для Pillow
+# Устанавливаем системные зависимости + шрифт DejaVuSans
 RUN apt-get update && apt-get install -y \
-    libjpeg-dev zlib1g-dev && \
+    libjpeg-dev zlib1g-dev fonts-dejavu-core && \
     rm -rf /var/lib/apt/lists/*
 
 # Создаём рабочую директорию
