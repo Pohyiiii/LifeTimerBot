@@ -102,3 +102,5 @@ flask_thread.start()
 # Затем запускаем самого Telegram-бота
 run_bot()
 
+
+
