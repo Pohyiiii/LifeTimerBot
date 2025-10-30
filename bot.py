@@ -75,3 +75,21 @@ def send_life_image(message):
         bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.ММ.ГГГГ")
 
 bot.polling()
+# --- Render keep-alive trick ---
+import threading
+import time
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "Bot is running!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
+
+# Запускаем Flask в отдельном потоке
+threading.Thread(target=run_flask).start()
+# --- конец трюка ---
+
