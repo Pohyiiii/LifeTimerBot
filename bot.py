@@ -1,6 +1,9 @@
 import telebot
 from datetime import date
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont  # добавил ImageFont
+import os
+import threading
+from flask import Flask
 
 BOT_TOKEN = "8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8"
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -52,6 +55,7 @@ def generate_life_weeks_image(birth_date, current_date):
 
     return img
 
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.reply_to(
@@ -59,6 +63,7 @@ def send_welcome(message):
         "👋 Привет! Я помогу тебе увидеть, как проходит твоя жизнь по неделям.\n"
         "Отправь мне дату своего рождения в формате: ДД.ММ.ГГГГ"
     )
+
 
 @bot.message_handler(func=lambda message: True)
 def send_life_image(message):
@@ -74,11 +79,8 @@ def send_life_image(message):
     except Exception:
         bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.ММ.ГГГГ")
 
-bot.polling()
-import os
-import threading
-from flask import Flask
 
+# ---------- Flask для Render ----------
 app = Flask(__name__)
 
 @app.route('/')
@@ -94,13 +96,10 @@ def run_bot():
     print("🤖 Telegram bot is polling...")
     bot.polling(none_stop=True, interval=0)
 
-# Сначала запускаем Flask, чтобы Render увидел порт
+# Flask запускается первым
 flask_thread = threading.Thread(target=run_flask)
 flask_thread.daemon = True
 flask_thread.start()
 
-# Затем запускаем самого Telegram-бота
+# Затем запускаем Telegram-бота
 run_bot()
-
-
-

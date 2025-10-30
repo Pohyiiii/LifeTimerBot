@@ -1,12 +1,12 @@
-# Берём официальный образ Python
+# Используем официальный образ Python
 FROM python:3.11-slim
 
-# Устанавливаем системные зависимости для Pillow
+# Устанавливаем зависимости для Pillow
 RUN apt-get update && apt-get install -y \
     libjpeg-dev zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Создаём рабочую папку
+# Создаём рабочую директорию
 WORKDIR /app
 
 # Копируем файлы проекта
@@ -16,5 +16,8 @@ COPY . .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Команда запуска бота
+# Устанавливаем переменную окружения, чтобы Flask слушал нужный порт
+ENV PORT=8080
+
+# Запускаем Flask и Telegram-бота
 CMD ["python", "bot.py"]
