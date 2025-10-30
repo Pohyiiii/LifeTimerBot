@@ -1,6 +1,6 @@
 import telebot
 from datetime import date
-from PIL import Image, ImageDraw, ImageFont  # добавил ImageFont
+from PIL import Image, ImageDraw, ImageFont
 import os
 import threading
 from flask import Flask
@@ -21,18 +21,18 @@ def generate_life_weeks_image(birth_date, current_date):
     margin = 2
     top_space = 80  # место для текста сверху
 
-    img_width = cols * (size + margin) + margin + 60  # немного шире для подписей
+    img_width = cols * (size + margin) + margin + 60
     img_height = rows * (size + margin) + margin + top_space
     img = Image.new("RGB", (img_width, img_height), "white")
     draw = ImageDraw.Draw(img)
 
     # Шрифт
-try:
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
-    title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-except:
-    font = ImageFont.load_default()
-    title_font = ImageFont.load_default()
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    except:
+        font = ImageFont.load_default()
+        title_font = ImageFont.load_default()
 
     # Заголовок
     text = f"Прожито: {lived_weeks} недель ({lived_days} дней)"
