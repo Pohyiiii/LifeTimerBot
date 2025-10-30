@@ -2,11 +2,10 @@ import telebot
 from datetime import date
 from PIL import Image, ImageDraw, ImageFont
 import os
-import threading
-from flask import Flask
+from flask import Flask, request
 
 BOT_TOKEN = "8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8"
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN, threaded=False)  # Отключаем потоковую обработку
 
 # Функция для генерации изображения с неделями
 def generate_life_weeks_image(birth_date, current_date):
@@ -26,7 +25,6 @@ def generate_life_weeks_image(birth_date, current_date):
     img = Image.new("RGB", (img_width, img_height), "white")
     draw = ImageDraw.Draw(img)
 
-    # Шрифт
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
         title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
@@ -34,19 +32,15 @@ def generate_life_weeks_image(birth_date, current_date):
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
-    # Заголовок
     text = f"Прожито: {lived_weeks} недель ({lived_days} дней)"
     draw.text((10, 10), text, fill="black", font=title_font)
 
-    # Подписи недель сверху
     for w in range(0, cols, 5):
         draw.text((60 + w * (size + margin), top_space - 20), str(w + 1), fill="gray", font=font)
 
-    # Подписи лет слева
     for y in range(rows):
         draw.text((10, top_space + y * (size + margin)), str(y + 1), fill="gray", font=font)
 
-    # Сетка
     for i in range(total_weeks):
         x = 60 + (i % cols) * (size + margin)
         y = top_space + (i // cols) * (size + margin)
@@ -54,7 +48,6 @@ def generate_life_weeks_image(birth_date, current_date):
         draw.rectangle([x, y, x + size, y + size], fill=color)
 
     return img
-
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -64,13 +57,10 @@ def send_welcome(message):
         "Отправь мне дату своего рождения в формате: ДД.ММ.ГГГГ"
     )
 
-
 @bot.message_handler(func=lambda message: True)
 def send_life_image(message):
     try:
-        birth_date = date.fromisoformat(
-            "-".join(reversed(message.text.split('.')))
-        )
+        birth_date = date.fromisoformat("-".join(reversed(message.text.split('.'))))
         current_date = date.today()
         img = generate_life_weeks_image(birth_date, current_date)
         img.save("life.png")
@@ -79,27 +69,26 @@ def send_life_image(message):
     except Exception:
         bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.ММ.ГГГГ")
 
-
-# ---------- Flask для Render ----------
+# ---------- Flask для Render Webhook ----------
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
     return "✅ Bot is running and Flask server is alive!"
 
-def run_flask():
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def webhook():
+    json_str = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return '', 200
+
+if __name__ == "__main__":
+    # Устанавливаем webhook
+    WEBHOOK_URL = f"https://lifetimerbot.onrender.com/{BOT_TOKEN}"
+    bot.remove_webhook()
+    bot.set_webhook(url=WEBHOOK_URL)
+    
+    # Запуск Flask
     port = int(os.environ.get("PORT", 8080))
-    print(f"🌐 Starting Flask on port {port}")
     app.run(host="0.0.0.0", port=port)
-
-def run_bot():
-    print("🤖 Telegram bot is polling...")
-    bot.polling(none_stop=True, interval=0)
-
-# Flask запускается первым
-flask_thread = threading.Thread(target=run_flask)
-flask_thread.daemon = True
-flask_thread.start()
-
-# Затем запускаем Telegram-бота
-run_bot()
