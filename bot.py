@@ -83,15 +83,22 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running!"
+    return "✅ Bot is running and Flask server is alive!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
+    print(f"🌐 Starting Flask on port {port}")
     app.run(host="0.0.0.0", port=port)
 
 def run_bot():
+    print("🤖 Telegram bot is polling...")
     bot.polling(none_stop=True, interval=0)
 
-threading.Thread(target=run_flask).start()
+# Сначала запускаем Flask, чтобы Render увидел порт
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
 
+# Затем запускаем самого Telegram-бота
 run_bot()
+
