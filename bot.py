@@ -25,49 +25,44 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
     size = 10
     margin = 2
     top_space = 80
-    left_space = 50
+    left_space = 55
 
     img_width = cols * (size + margin) + margin + left_space + 10
     img_height = rows * (size + margin) + margin + top_space + 10
     img = Image.new("RGB", (img_width, img_height), "white")
     draw = ImageDraw.Draw(img)
 
-    # Подключаем шрифт Noto Sans
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 13)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 12)
         title_font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 18)
     except:
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
-    # Текст сверху
+    # Верхний текст
     text1 = f"Прожито: {lived_weeks} недель ({lived_days} дней)"
     text2 = f"Осталось примерно: {remaining_weeks} недель ({remaining_days} дней)"
     draw.text((10, 10), text1, fill="black", font=title_font)
     draw.text((10, 40), text2, fill="gray", font=font)
 
-    # Подписи месяцев сверху: 4,8,12,...,52 (ставим метки именно на 4-ю, 8-ю и т.д. клетки)
-    for month_index in range(1, cols // 4 + 1):  # 1..13
-        week_index = month_index * 4  # 4,8,...
-        # вычисляем позицию центра соответствующей клетки (week_index - 1) — 0-based
+    # Подписи месяцев сверху (4, 8, 12...)
+    for month_index in range(1, cols // 4 + 1):
+        week_index = month_index * 4
         cell_x = left_space + (week_index - 1) * (size + margin)
         label = str(week_index)
-        tw, th = font.getsize(label)
+        tw, th = draw.textsize(label, font=font)
+        # немного опускаем текст — ближе к клеткам
         x_text = cell_x + (size - tw) / 2
-        y_text = top_space - 24  # чуть выше клетки
+        y_text = top_space - 16
         draw.text((x_text, y_text), label, fill="gray", font=font)
 
-    # Подписи лет слева (выровнены по центру квадрата и ближе к сетке)
-    # выровняем вертикально по центру клетки и подвинем горизонтально ближе к клеткам
-    sample_text = "0"
-    try:
-        _, sample_h = font.getsize(sample_text)
-    except:
-        sample_h = 12
+    # Подписи лет слева (по центру клетки, немного отодвинуты)
     for y in range(rows):
         cell_y = top_space + y * (size + margin)
-        y_pos = cell_y + (size - sample_h) / 2
-        x_pos = left_space - 14
+        # выравнивание по вертикали центра клетки
+        _, th = draw.textsize(str(y + 1), font=font)
+        y_pos = cell_y + (size - th) / 2
+        x_pos = left_space - 22  # немного дальше от клеток
         draw.text((x_pos, y_pos), str(y + 1), fill="gray", font=font)
 
     # Сетка
