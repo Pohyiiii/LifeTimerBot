@@ -1,9 +1,9 @@
 # Используем официальный образ Python
 FROM python:3.11-slim
 
-# Устанавливаем системные зависимости + шрифт DejaVuSans
+# Устанавливаем системные зависимости + шрифт Noto Sans
 RUN apt-get update && apt-get install -y \
-    libjpeg-dev zlib1g-dev fonts-dejavu-core && \
+    libjpeg-dev zlib1g-dev fonts-noto && \
     rm -rf /var/lib/apt/lists/*
 
 # Создаём рабочую директорию
