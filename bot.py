@@ -24,37 +24,41 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
     rows = life_expectancy_years
     size = 10
     margin = 2
-    top_space = 100
+    top_space = 80
+    left_space = 50
 
-    img_width = cols * (size + margin) + margin + 60
-    img_height = rows * (size + margin) + margin + top_space
+    img_width = cols * (size + margin) + margin + left_space + 10
+    img_height = rows * (size + margin) + margin + top_space + 10
     img = Image.new("RGB", (img_width, img_height), "white")
     draw = ImageDraw.Draw(img)
 
     # Подключаем шрифт Noto Sans
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 14)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 13)
         title_font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 18)
     except:
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
+    # Текст сверху
     text1 = f"Прожито: {lived_weeks} недель ({lived_days} дней)"
     text2 = f"Осталось примерно: {remaining_weeks} недель ({remaining_days} дней)"
     draw.text((10, 10), text1, fill="black", font=title_font)
     draw.text((10, 40), text2, fill="gray", font=font)
 
-    # Подписи недель сверху
+    # Подписи месяцев сверху (каждые 4 недели)
     for w in range(0, cols, 4):
-        draw.text((60 + w * (size + margin), top_space - 20), str(w + 1), fill="gray", font=font)
+        x = left_space + w * (size + margin) + size / 2
+        draw.text((x - 6, top_space - 20), str(w + 4), fill="gray", font=font)
 
-    # Подписи лет слева
+    # Подписи лет слева (выровнены по центру квадрата)
     for y in range(rows):
-        draw.text((10, top_space + y * (size + margin)), str(y + 1), fill="gray", font=font)
+        y_pos = top_space + y * (size + margin) + (size / 2) - 6
+        draw.text((10, y_pos), str(y + 1), fill="gray", font=font)
 
     # Сетка
     for i in range(total_weeks):
-        x = 60 + (i % cols) * (size + margin)
+        x = left_space + (i % cols) * (size + margin)
         y = top_space + (i // cols) * (size + margin)
         color = (220, 20, 60) if i < lived_weeks else (230, 230, 230)
         draw.rectangle([x, y, x + size, y + size], fill=color)
