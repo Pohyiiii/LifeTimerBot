@@ -10,20 +10,43 @@ def generate_life_weeks_image(birth_date, current_date):
     life_expectancy_years = 90
     total_weeks = life_expectancy_years * 52
     lived_weeks = (current_date - birth_date).days // 7
+    lived_days = (current_date - birth_date).days
 
     cols = 52
     rows = life_expectancy_years
     size = 10
     margin = 2
+    top_space = 80  # место для текста сверху
 
-    img_width = cols * (size + margin) + margin
-    img_height = rows * (size + margin) + margin
+    img_width = cols * (size + margin) + margin + 60  # немного шире для подписей
+    img_height = rows * (size + margin) + margin + top_space
     img = Image.new("RGB", (img_width, img_height), "white")
     draw = ImageDraw.Draw(img)
 
+    # Шрифт
+    try:
+        font = ImageFont.truetype("arial.ttf", 14)
+        title_font = ImageFont.truetype("arial.ttf", 18)
+    except:
+        font = ImageFont.load_default()
+        title_font = ImageFont.load_default()
+
+    # Заголовок
+    text = f"Прожито: {lived_weeks} недель ({lived_days} дней)"
+    draw.text((10, 10), text, fill="black", font=title_font)
+
+    # Подписи недель сверху
+    for w in range(0, cols, 5):
+        draw.text((60 + w * (size + margin), top_space - 20), str(w + 1), fill="gray", font=font)
+
+    # Подписи лет слева
+    for y in range(rows):
+        draw.text((10, top_space + y * (size + margin)), str(y + 1), fill="gray", font=font)
+
+    # Сетка
     for i in range(total_weeks):
-        x = margin + (i % cols) * (size + margin)
-        y = margin + (i // cols) * (size + margin)
+        x = 60 + (i % cols) * (size + margin)
+        y = top_space + (i // cols) * (size + margin)
         color = (220, 20, 60) if i < lived_weeks else (230, 230, 230)
         draw.rectangle([x, y, x + size, y + size], fill=color)
 
