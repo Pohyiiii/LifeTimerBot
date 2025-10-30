@@ -3,8 +3,9 @@ FROM python:3.11-slim
 
 # Устанавливаем системные зависимости + шрифт Noto Sans
 RUN apt-get update && apt-get install -y \
-    libjpeg-dev zlib1g-dev fonts-noto && \
+    libjpeg-dev zlib1g-dev fonts-noto-core && \
     rm -rf /var/lib/apt/lists/*
+
 
 # Создаём рабочую директорию
 WORKDIR /app
