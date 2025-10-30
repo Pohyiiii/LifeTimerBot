@@ -46,15 +46,29 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
     draw.text((10, 10), text1, fill="black", font=title_font)
     draw.text((10, 40), text2, fill="gray", font=font)
 
-    # Подписи месяцев сверху (каждые 4 недели)
-    for w in range(0, cols, 4):
-        x = left_space + w * (size + margin) + size / 2
-        draw.text((x - 6, top_space - 20), str(w + 4), fill="gray", font=font)
+    # Подписи месяцев сверху: 4,8,12,...,52 (ставим метки именно на 4-ю, 8-ю и т.д. клетки)
+    for month_index in range(1, cols // 4 + 1):  # 1..13
+        week_index = month_index * 4  # 4,8,...
+        # вычисляем позицию центра соответствующей клетки (week_index - 1) — 0-based
+        cell_x = left_space + (week_index - 1) * (size + margin)
+        label = str(week_index)
+        tw, th = font.getsize(label)
+        x_text = cell_x + (size - tw) / 2
+        y_text = top_space - 24  # чуть выше клетки
+        draw.text((x_text, y_text), label, fill="gray", font=font)
 
-    # Подписи лет слева (выровнены по центру квадрата)
+    # Подписи лет слева (выровнены по центру квадрата и ближе к сетке)
+    # выровняем вертикально по центру клетки и подвинем горизонтально ближе к клеткам
+    sample_text = "0"
+    try:
+        _, sample_h = font.getsize(sample_text)
+    except:
+        sample_h = 12
     for y in range(rows):
-        y_pos = top_space + y * (size + margin) + (size / 2) - 6
-        draw.text((10, y_pos), str(y + 1), fill="gray", font=font)
+        cell_y = top_space + y * (size + margin)
+        y_pos = cell_y + (size - sample_h) / 2
+        x_pos = left_space - 14
+        draw.text((x_pos, y_pos), str(y + 1), fill="gray", font=font)
 
     # Сетка
     for i in range(total_weeks):
