@@ -188,19 +188,18 @@ def set_life_expectancy(call):
 
 # ---------- ОБРАБОТКА СООБЩЕНИЙ (ДРУЖЕЛЮБНАЯ) ----------
 @bot.message_handler(func=lambda message: True)
-@bot.message_handler(func=lambda message: True)
 def handle_message(message):
     user_id = str(message.from_user.id)
     text = message.text.strip()
 
     # Если пользователь меняет дату
-    if user_id in awaiting_birth_date_change:
+    if user_id in awaiting_birth_date_change or "birth_date" not in users.get(user_id, {}):
         try:
             new_birth_date = datetime.strptime(text, "%d.%m.%Y").date()
             users.setdefault(user_id, {})
             users[user_id]["birth_date"] = new_birth_date.isoformat()
             save_users(users)
-            awaiting_birth_date_change.remove(user_id)
+            awaiting_birth_date_change.discard(user_id)
 
             years = users[user_id].get("life_expectancy", 80)
             img = generate_life_weeks_image(new_birth_date, date.today(), years)
@@ -236,8 +235,6 @@ def handle_message(message):
         for y in [70, 80, 90]:
             markup_inline.add(types.InlineKeyboardButton(f"{y} лет", callback_data=f"years_{y}"))
         bot.send_message(message.chat.id, "Выбери предполагаемую продолжительность жизни:", reply_markup=markup_inline)
-
-    # Всё остальное игнорируем — бот больше ничего не пишет
 
 
 # ---------- FLASK ----------
