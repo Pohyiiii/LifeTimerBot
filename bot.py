@@ -1,5 +1,5 @@
 import telebot
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from PIL import Image, ImageDraw, ImageFont
 import os
@@ -13,8 +13,8 @@ import pytz
 # ---------- НАСТРОЙКИ ----------
 BOT_TOKEN = "8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8"
 DATA_FILE = "users.json"
+TIMEZONE = "Europe/Moscow"  # используем для APScheduler
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
-TIMEZONE = "Europe/Moscow"
 
 # ---------- ЗАГРУЗКА / СОХРАНЕНИЕ ----------
 def load_users():
@@ -33,18 +33,24 @@ users = load_users()
 awaiting_birth_date_change = set()
 
 # ---------- ЦИТАТЫ ----------
-quotes = ["Жизнь не загадка, а процесс.", "Просто живи.", "Каждый день — шанс начать с нуля.", "Сегодня — начало остальной части твоей жизни.", "Не спеши. Успеешь."]
-
-# ---------- ПОЗДРАВЛЕНИЯ ----------
-birthday_msgs = [
-    "🎉 С днём рождения! Ещё один виток вокруг солнца 🌍 Пусть впереди будет больше тёплых недель, чем позади ✨",
-    "🥳 Поздравляю с днём рождения! Желаю много ярких и тёплых моментов в жизни ✌️",
-    "🎈 С днём рождения! Пусть каждый день приносит радость и вдохновение 🌟"
+quotes = [
+    "Жизнь не загадка, а процесс.",
+    "Просто живи.",
+    "Каждый день — шанс начать с нуля.",
+    "Сегодня — начало остальной части твоей жизни.",
+    "Не спеши. Успеешь."
 ]
 
-new_year_msgs = [
+# ---------- ПОЗДРАВЛЕНИЯ ----------
+birthday_messages = [
+    "🎉 С Днём Рождения! Пусть этот год принесёт только радость ✌️",
+    "🥳 Поздравляю с ДР! Желаю больших побед и маленьких удовольствий 🎁",
+    "✨ С Днём Рождения! Пусть каждый день будет как подарок"
+]
+
+new_year_messages = [
     "🎇 С Новым годом! Пусть всё плохое останется в прошлом, а впереди будет место для лёгкости и вдохновения ✨",
-    "🥂 С Новым годом! Пусть этот год будет без суеты — с правильными людьми и настоящими моментами ❤️",
+    "🥂 С праздником! Пусть этот год будет без суеты — с правильными людьми и настоящими моментами ❤️",
     "🌟 С Новым годом! Желаю, чтобы мечты сами находили дорогу к тебе ✌️"
 ]
 
@@ -73,7 +79,6 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
-    # перемещаем надписи выше, чтобы не пересекались
     draw.text((10, 10), f"Прожито: {lived_weeks} недель ({lived_days} дней)", fill="black", font=title_font)
     remaining_weeks = total_weeks - lived_weeks
     remaining_days = (birth_date + relativedelta(weeks=total_weeks) - current_date).days
@@ -95,7 +100,6 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
 
     return img
 
-
 def generate_life_months_image(birth_date, current_date, life_expectancy_years=80):
     total_months = life_expectancy_years * 12
     lived_months = (current_date.year - birth_date.year) * 12 + (current_date.month - birth_date.month)
@@ -105,7 +109,7 @@ def generate_life_months_image(birth_date, current_date, life_expectancy_years=8
     size = 20
     margin = 2
     left_space = 35
-    top_space = 70  # подняли таблицу вниз, чтобы сверху поместились надписи
+    top_space = 70
 
     img_width = cols * (size + margin) + margin + left_space + 20
     img_height = rows * (size + margin) + margin + top_space + 20
@@ -119,22 +123,18 @@ def generate_life_months_image(birth_date, current_date, life_expectancy_years=8
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
-    # перенесли текст выше
     draw.text((10, 10), f"Прожито: {lived_months} месяцев", fill="black", font=title_font)
     remaining_months = total_months - lived_months
     draw.text((10, 30), f"Осталось: {remaining_months} месяцев", fill="gray", font=font)
 
-    # цифры месяцев сверху
     for m in range(1, 13):
         x_pos = left_space + (m - 1) * (size + margin)
         draw.text((x_pos + 5, top_space - 18), str(m), fill="gray", font=font)
 
-    # цифры лет слева
     for y in range(rows):
         y_pos = top_space + y * (size + margin) - 2
         draw.text((10, y_pos), str(y + 1), fill="gray", font=font)
 
-    # прямоугольники
     for i in range(total_months):
         x = left_space + (i % cols) * (size + margin)
         y = top_space + (i // cols) * (size + margin)
@@ -149,65 +149,106 @@ def main_reply_keyboard():
     markup.add("Изменить дату рождения", "Посмотреть жизнь по месяцам", "Изменить продолжительность жизни")
     return markup
 
-# ---------- ФУНКЦИИ ОТПРАВКИ ----------
-def send_life_image(user_id, include_quote=True):
-    info = users.get(str(user_id), {})
-    if "birth_date" not in info:
+# ---------- START ----------
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    markup_inline = types.InlineKeyboardMarkup()
+    for y in [70, 80, 90]:
+        markup_inline.add(types.InlineKeyboardButton(f"{y} лет", callback_data=f"years_{y}"))
+    bot.send_message(
+        message.chat.id,
+        "👋 Привет! Я помогу тебе увидеть, как проходит твоя жизнь по неделям.\n\n"
+        "Выбери предполагаемую продолжительность жизни:",
+        reply_markup=markup_inline
+    )
+
+# ---------- CALLBACK ----------
+@bot.callback_query_handler(func=lambda call: call.data.startswith("years_"))
+def set_life_expectancy(call):
+    years = int(call.data.split("_")[1])
+    user_id = str(call.from_user.id)
+
+    users.setdefault(user_id, {})
+    users[user_id]["life_expectancy"] = years
+    save_users(users)
+
+    bot.answer_callback_query(call.id, f"Выбрано: {years} лет")
+
+    if "birth_date" in users[user_id]:
+        birth_date = datetime.fromisoformat(users[user_id]["birth_date"]).date()
+        img = generate_life_weeks_image(birth_date, date.today(), years)
+        img.save("life.png")
+        quote = random.choice(quotes)
+        with open("life.png", "rb") as photo:
+            bot.send_photo(call.message.chat.id, photo,
+                           caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
+                           reply_markup=main_reply_keyboard())
+    else:
+        bot.send_message(call.message.chat.id, "Отлично! Теперь отправь дату рождения в формате: ДД.MM.ГГГГ")
+
+# ---------- ОБРАБОТКА СООБЩЕНИЙ ----------
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    user_id = str(message.from_user.id)
+
+    if user_id in awaiting_birth_date_change:
+        try:
+            new_birth_date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            users.setdefault(user_id, {})
+            users[user_id]["birth_date"] = new_birth_date.isoformat()
+            save_users(users)
+            awaiting_birth_date_change.remove(user_id)
+
+            years = users[user_id].get("life_expectancy", 80)
+            img = generate_life_weeks_image(new_birth_date, date.today(), years)
+            img.save("life.png")
+            quote = random.choice(quotes)
+            with open("life.png", "rb") as photo:
+                bot.send_photo(message.chat.id, photo,
+                               caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
+                               reply_markup=main_reply_keyboard())
+        except ValueError:
+            bot.reply_to(message, "⚠️ Введи дату в формате ДД.MM.ГГГГ")
         return
 
-    birth_date = datetime.fromisoformat(info["birth_date"]).date()
-    years = info.get("life_expectancy", 80)
-    img = generate_life_weeks_image(birth_date, date.today(), years)
-    img.save("life.png")
-    caption = ""
-    if include_quote:
-        caption = random.choice(quotes)
-        caption += f"\n\nВот твоя жизнь в неделях (до {years} лет) 🕰"
-
+    text = message.text.strip()
+    if text == "Изменить дату рождения":
+        awaiting_birth_date_change.add(user_id)
+        bot.send_message(message.chat.id, "Отправь новую дату рождения в формате: ДД.MM.ГГГГ")
+    elif text == "Посмотреть жизнь по месяцам":
+        info = users.get(user_id, {})
+        if "birth_date" not in info:
+            bot.send_message(message.chat.id, "Сначала установи дату рождения через 'Изменить дату рождения'.")
+            return
+        birth_date = datetime.fromisoformat(info["birth_date"]).date()
+        years = info.get("life_expectancy", 80)
+        img = generate_life_months_image(birth_date, date.today(), years)
+        img.save("life_months.png")
+        quote = random.choice(quotes)
+        with open("life_months.png", "rb") as photo:
+            bot.send_photo(message.chat.id, photo,
+                           caption=f"{quote}\n\nВот твоя жизнь по месяцам 📆")
+    elif text == "Изменить продолжительность жизни":
+        markup_inline = types.InlineKeyboardMarkup()
+        for y in [70, 80, 90]:
+            markup_inline.add(types.InlineKeyboardButton(f"{y} лет", callback_data=f"years_{y}"))
+        bot.send_message(message.chat.id, "Выбери предполагаемую продолжительность жизни:", reply_markup=markup_inline)
     else:
-        caption = f"Вот твоя жизнь в неделях (до {years} лет) 🕰"
-
-    with open("life.png", "rb") as photo:
-        bot.send_photo(user_id, photo, caption=caption, reply_markup=main_reply_keyboard())
-
-def send_birthday(user_id):
-    msg = random.choice(birthday_msgs)
-    send_life_image(user_id, include_quote=False)
-    bot.send_message(user_id, msg)
-
-def send_new_year(user_id):
-    msg = random.choice(new_year_msgs)
-    send_life_image(user_id, include_quote=False)
-    bot.send_message(user_id, msg)
-
-# ---------- ПЛАНИРОВЩИК ----------
-scheduler = BackgroundScheduler(timezone=TIMEZONE)
-
-def daily_check():
-    today = datetime.now(pytz.timezone(TIMEZONE)).date()
-    for user_id_str, info in users.items():
-        user_id = int(user_id_str)
-        birth_date = datetime.fromisoformat(info.get("birth_date")).date()
-        # Проверка ДР
-        if birth_date.day == today.day and birth_date.month == today.month:
-            send_birthday(user_id)
-        else:
-            # В обычные дни — обновляем таблицу с цитатой
-            send_life_image(user_id, include_quote=True)
-
-def new_year_check():
-    today = datetime.now(pytz.timezone(TIMEZONE))
-    if today.month == 1 and today.day == 1 and today.hour == 0:
-        for user_id_str in users.keys():
-            user_id = int(user_id_str)
-            send_new_year(user_id)
-
-scheduler.add_job(daily_check, "cron", hour=10, minute=0)  # каждый день в 10:00
-scheduler.add_job(new_year_check, "cron", month=1, day=1, hour=0, minute=0)  # 1 января 00:00
-scheduler.start()
-
-# ---------- START, CALLBACK, MESSAGE HANDLER ----------
-# (Тут вставляем весь твой код для /start, callback_query_handler и handle_message без изменений)
+        try:
+            birth_date = datetime.strptime(text, "%d.%m.%Y").date()
+            users.setdefault(user_id, {})
+            users[user_id]["birth_date"] = birth_date.isoformat()
+            years = users[user_id].get("life_expectancy", 80)
+            save_users(users)
+            img = generate_life_weeks_image(birth_date, date.today(), years)
+            img.save("life.png")
+            quote = random.choice(quotes)
+            with open("life.png", "rb") as photo:
+                bot.send_photo(message.chat.id, photo,
+                               caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
+                               reply_markup=main_reply_keyboard())
+        except ValueError:
+            bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.MM.ГГГГ")
 
 # ---------- FLASK ----------
 app = Flask(__name__)
@@ -218,14 +259,46 @@ def home():
 
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
-    update = telebot.types.Update.de_json(request.get_data().decode('utf-8'))
+    json_str = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_str)
     bot.process_new_updates([update])
     return '', 200
 
-if __name__ == "__main__":
-    WEBHOOK_URL = f"https://lifetimerbot.onrender.com/{BOT_TOKEN}"
-    bot.remove_webhook()
-    bot.set_webhook(url=WEBHOOK_URL)
+# ---------- ПЛАНИРОВЩИК ----------
+scheduler = BackgroundScheduler(timezone=pytz.timezone(TIMEZONE))
 
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+def daily_update():
+    today = date.today()
+    for user_id, info in users.items():
+        if "birth_date" not in info:
+            continue
+        birth_date = datetime.fromisoformat(info["birth_date"]).date()
+        years = info.get("life_expectancy", 80)
+
+        img = generate_life_weeks_image(birth_date, today, years)
+        filename = f"life_{user_id}.png"
+        img.save(filename)
+
+        # ДР
+        if birth_date.day == today.day and birth_date.month == today.month:
+            message = random.choice(birthday_messages)
+            with open(filename, "rb") as photo:
+                bot.send_photo(user_id, photo, caption=message)
+
+        # Новый год
+        if today.month == 1 and today.day == 1:
+            message = random.choice(new_year_messages)
+            with open(filename, "rb") as photo:
+                bot.send_photo(user_id, photo, caption=message)
+
+scheduler.add_job(daily_update, 'cron', hour=9, minute=0)  # каждый день в 9:00
+scheduler.start()
+
+# ---------- ВЕБХУК НА RENDER ----------
+bot.remove_webhook()
+https://lifetimerbot.onrender.com/8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8
+bot.set_webhook(url=WEBHOOK_URL)
+
+# ---------- ЗАПУСК FLASK ----------
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
