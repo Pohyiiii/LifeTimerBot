@@ -1,18 +1,31 @@
 import telebot
-from datetime import date
+from datetime import date, timedelta, datetime
 from PIL import Image, ImageDraw, ImageFont
 import os
+import json
 from flask import Flask, request
 from telebot import types
+from apscheduler.schedulers.background import BackgroundScheduler
 
+# ---------- НАСТРОЙКИ ----------
 BOT_TOKEN = "8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8"
+DATA_FILE = "users.json"
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 
-# Хранение данных пользователей
-user_life_expectancy = {}
-user_state = {}  # состояние диалога
+# ---------- ЗАГРУЗКА / СОХРАНЕНИЕ ПОЛЬЗОВАТЕЛЕЙ ----------
+def load_users():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
-# ---------- ФУНКЦИЯ СОЗДАНИЯ ИЗОБРАЖЕНИЯ ----------
+def save_users(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+users = load_users()
+
+# ---------- СОЗДАНИЕ КАРТИНКИ ----------
 def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80):
     total_weeks = life_expectancy_years * 52
     lived_weeks = (current_date - birth_date).days // 7
@@ -24,46 +37,35 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
     rows = life_expectancy_years
     size = 10
     margin = 2
-    top_space = 80
-    left_space = 55
+    left_space = 35
+    top_space = 90
 
-    img_width = cols * (size + margin) + margin + left_space + 10
-    img_height = rows * (size + margin) + margin + top_space + 10
+    img_width = cols * (size + margin) + margin + left_space + 20
+    img_height = rows * (size + margin) + margin + top_space + 20
     img = Image.new("RGB", (img_width, img_height), "white")
     draw = ImageDraw.Draw(img)
 
+    # Шрифт
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 12)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 14)
         title_font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 18)
     except:
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
-    # Верхний текст
-    text1 = f"Прожито: {lived_weeks} недель ({lived_days} дней)"
-    text2 = f"Осталось примерно: {remaining_weeks} недель ({remaining_days} дней)"
-    draw.text((10, 10), text1, fill="black", font=title_font)
-    draw.text((10, 40), text2, fill="gray", font=font)
+    # Текст сверху
+    draw.text((10, 10), f"Прожито: {lived_weeks} недель ({lived_days} дней)", fill="black", font=title_font)
+    draw.text((10, 40), f"Осталось: {remaining_weeks} недель ({remaining_days} дней)", fill="gray", font=font)
 
-    # Подписи месяцев сверху (4, 8, 12...)
-    for month_index in range(1, cols // 4 + 1):
-        week_index = month_index * 4
-        cell_x = left_space + (week_index - 1) * (size + margin)
-        label = str(week_index)
-        tw, th = draw.textsize(label, font=font)
-        # немного опускаем текст — ближе к клеткам
-        x_text = cell_x + (size - tw) / 2
-        y_text = top_space - 16
-        draw.text((x_text, y_text), label, fill="gray", font=font)
+    # Подписи недель сверху (4, 8, 12, ...)
+    for w in range(4, cols + 1, 4):
+        x_pos = left_space + (w - 1) * (size + margin)
+        draw.text((x_pos, top_space - 18), str(w), fill="gray", font=font)
 
-    # Подписи лет слева (по центру клетки, немного отодвинуты)
+    # Подписи лет слева
     for y in range(rows):
-        cell_y = top_space + y * (size + margin)
-        # выравнивание по вертикали центра клетки
-        _, th = draw.textsize(str(y + 1), font=font)
-        y_pos = cell_y + (size - th) / 2
-        x_pos = left_space - 22  # немного дальше от клеток
-        draw.text((x_pos, y_pos), str(y + 1), fill="gray", font=font)
+        y_pos = top_space + y * (size + margin) - 5
+        draw.text((10, y_pos), str(y + 1), fill="gray", font=font)
 
     # Сетка
     for i in range(total_weeks):
@@ -74,8 +76,7 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
 
     return img
 
-
-# ---------- TELEGRAM ----------
+# ---------- ОСНОВНАЯ ЛОГИКА ----------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = types.InlineKeyboardMarkup()
@@ -87,56 +88,57 @@ def send_welcome(message):
         "Выбери предполагаемую продолжительность жизни:",
         reply_markup=markup
     )
-    user_state[message.from_user.id] = "choosing_years"
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("years_"))
 def set_life_expectancy(call):
     years = int(call.data.split("_")[1])
-    user_life_expectancy[call.from_user.id] = years
-    user_state[call.from_user.id] = "waiting_for_date"
-
+    user_id = str(call.from_user.id)
+    if user_id not in users:
+        users[user_id] = {}
+    users[user_id]["life_expectancy"] = years
+    save_users(users)
     bot.answer_callback_query(call.id, f"Выбрано: {years} лет")
-    bot.send_message(
-        call.message.chat.id,
-        f"Отлично! Будем считать {years} лет.\nТеперь отправь дату рождения в формате: ДД.ММ.ГГГГ"
-    )
-
+    bot.send_message(call.message.chat.id, f"Отлично! Теперь отправь дату рождения в формате: ДД.ММ.ГГГГ")
 
 @bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    user_id = message.from_user.id
+def send_life_image(message):
+    user_id = str(message.from_user.id)
+    try:
+        birth_date = datetime.strptime(message.text, "%d.%m.%Y").date()
+        current_date = date.today()
+        years = users.get(user_id, {}).get("life_expectancy", 80)
 
-    if user_state.get(user_id) == "waiting_for_date":
+        users[user_id]["birth_date"] = birth_date.isoformat()
+        save_users(users)
+
+        img = generate_life_weeks_image(birth_date, current_date, years)
+        img.save("life.png")
+        with open("life.png", "rb") as photo:
+            bot.send_photo(message.chat.id, photo, caption=f"Вот твоя жизнь до {years} лет 🕰")
+
+    except ValueError:
+        bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.ММ.ГГГГ")
+
+# ---------- ПЛАНИРОВЩИК (еженедельное обновление) ----------
+def send_weekly_updates():
+    today = date.today()
+    for user_id, info in users.items():
         try:
-            birth_date = date.fromisoformat("-".join(reversed(message.text.split('.'))))
-            current_date = date.today()
-            years = user_life_expectancy.get(user_id, 80)
-
-            img = generate_life_weeks_image(birth_date, current_date, years)
-            img.save("life.png")
-
-            with open("life.png", "rb") as photo:
-                bot.send_photo(
-                    message.chat.id,
-                    photo,
-                    caption=f"Вот твоя жизнь в неделях (расчёт до {years} лет) 🕰"
-                )
-
-            user_state[user_id] = "ready"
-
+            if "birth_date" in info:
+                birth_date = date.fromisoformat(info["birth_date"])
+                years = info.get("life_expectancy", 80)
+                img = generate_life_weeks_image(birth_date, today, years)
+                img.save("life.png")
+                with open("life.png", "rb") as photo:
+                    bot.send_photo(user_id, photo, caption=f"Обновлённая таблица на {today.strftime('%d.%m.%Y')} ✨")
         except Exception as e:
-            print("Ошибка:", e)
-            bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.ММ.ГГГГ")
+            print(f"Ошибка при обновлении для {user_id}: {e}")
 
-    else:
-        bot.send_message(
-            message.chat.id,
-            "Напиши /start, чтобы начать заново 👋"
-        )
+scheduler = BackgroundScheduler()
+scheduler.add_job(send_weekly_updates, 'cron', day_of_week='mon', hour=10, minute=0)
+scheduler.start()
 
-
-# ---------- FLASK / WEBHOOK ----------
+# ---------- FLASK ----------
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
@@ -145,11 +147,9 @@ def home():
 
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
-    json_str = request.get_data().decode('utf-8')
-    update = telebot.types.Update.de_json(json_str)
+    update = telebot.types.Update.de_json(request.get_data().decode('utf-8'))
     bot.process_new_updates([update])
     return '', 200
-
 
 if __name__ == "__main__":
     WEBHOOK_URL = f"https://lifetimerbot.onrender.com/{BOT_TOKEN}"
