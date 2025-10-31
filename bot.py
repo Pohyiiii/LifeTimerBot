@@ -186,14 +186,16 @@ def set_life_expectancy(call):
     else:
         bot.send_message(call.message.chat.id, "Отлично! Теперь отправь дату рождения в формате: ДД.MM.ГГГГ")
 
-# ---------- ОБРАБОТКА СООБЩЕНИЙ ----------
+# ---------- ОБРАБОТКА СООБЩЕНИЙ (ДРУЖЕЛЮБНАЯ) ----------
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     user_id = str(message.from_user.id)
+    text = message.text.strip()
 
+    # Если пользователь меняет дату
     if user_id in awaiting_birth_date_change:
         try:
-            new_birth_date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            new_birth_date = datetime.strptime(text, "%d.%m.%Y").date()
             users.setdefault(user_id, {})
             users[user_id]["birth_date"] = new_birth_date.isoformat()
             save_users(users)
@@ -204,14 +206,17 @@ def handle_message(message):
             img.save("life.png")
             quote = random.choice(quotes)
             with open("life.png", "rb") as photo:
-                bot.send_photo(message.chat.id, photo,
-                               caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
-                               reply_markup=main_reply_keyboard())
+                bot.send_photo(
+                    message.chat.id,
+                    photo,
+                    caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
+                    reply_markup=main_reply_keyboard()
+                )
         except ValueError:
             bot.reply_to(message, "⚠️ Введи дату в формате ДД.MM.ГГГГ")
         return
 
-    text = message.text.strip()
+    # Обработка кнопок
     if text == "Изменить дату рождения":
         awaiting_birth_date_change.add(user_id)
         bot.send_message(message.chat.id, "Отправь новую дату рождения в формате: ДД.MM.ГГГГ")
@@ -234,6 +239,7 @@ def handle_message(message):
             markup_inline.add(types.InlineKeyboardButton(f"{y} лет", callback_data=f"years_{y}"))
         bot.send_message(message.chat.id, "Выбери предполагаемую продолжительность жизни:", reply_markup=markup_inline)
     else:
+        # Проверяем, может это дата
         try:
             birth_date = datetime.strptime(text, "%d.%m.%Y").date()
             users.setdefault(user_id, {})
@@ -248,7 +254,11 @@ def handle_message(message):
                                caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
                                reply_markup=main_reply_keyboard())
         except ValueError:
-            bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.MM.ГГГГ")
+            # Если это не дата и не кнопка — один раз выводим подсказку
+            bot.send_message(message.chat.id,
+                             "⚠️ Пожалуйста, отправь дату рождения в формате ДД.MM.ГГГГ или используй кнопки")
+
+
 
 # ---------- FLASK ----------
 app = Flask(__name__)
