@@ -144,12 +144,19 @@ def generate_life_months_image(birth_date, current_date, life_expectancy_years=8
 # ---------- МЕНЮ И СТАРТ ----------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    user_id = str(message.from_user.id)
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Изменить дату рождения", callback_data="change_date"))
-    markup.add(types.InlineKeyboardButton("Посмотреть таблицу по месяцам", callback_data="months_table"))
-    for years in [70, 80, 90]:
-        markup.add(types.InlineKeyboardButton(f"{years} лет", callback_data=f"years_{years}"))
-    bot.send_message(message.chat.id, "👋 Привет! Выбери предполагаемую продолжительность жизни или действие:", reply_markup=markup)
+    # Если дата рождения у пользователя ещё нет, показываем только выбор продолжительности
+    if user_id not in users or "birth_date" not in users[user_id]:
+        for years in [70, 80, 90]:
+            markup.add(types.InlineKeyboardButton(f"{years} лет", callback_data=f"years_{years}"))
+        bot.send_message(message.chat.id, "👋 Привет! Выбери предполагаемую продолжительность жизни:", reply_markup=markup)
+    else:
+        # Если дата уже есть, показываем меню действий
+        markup.add(types.InlineKeyboardButton("Изменить дату рождения", callback_data="change_date"))
+        markup.add(types.InlineKeyboardButton("Посмотреть таблицу по месяцам", callback_data="months_table"))
+        bot.send_message(message.chat.id, "Выбери действие:", reply_markup=markup)
+
 
 # ---------- ОБРАБОТКА КНОПОК ----------
 @bot.callback_query_handler(func=lambda call: True)
