@@ -103,11 +103,13 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
 def send_welcome(message):
     user_id = str(message.from_user.id)
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Изменить дату рождения", callback_data="change_date"))
     
     if user_id in users and "birth_date" in users[user_id]:
+        # Если дата уже есть — показываем только кнопку изменить
+        markup.add(types.InlineKeyboardButton("Изменить дату рождения", callback_data="change_date"))
         bot.send_message(message.chat.id, "Привет! Ты уже добавил дату рождения.", reply_markup=markup)
     else:
+        # Новый пользователь — выбор продолжительности жизни
         for years in [70, 80, 90]:
             markup.add(types.InlineKeyboardButton(f"{years} лет", callback_data=f"years_{years}"))
         bot.send_message(
@@ -116,6 +118,7 @@ def send_welcome(message):
             "Выбери предполагаемую продолжительность жизни:",
             reply_markup=markup
         )
+
 
 # ---------- УСТАНОВКА ПРОДОЛЖИТЕЛЬНОСТИ ЖИЗНИ ----------
 @bot.callback_query_handler(func=lambda call: call.data.startswith("years_"))
