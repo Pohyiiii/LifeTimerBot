@@ -296,8 +296,9 @@ scheduler.start()
 
 # ---------- ВЕБХУК НА RENDER ----------
 bot.remove_webhook()
-https://lifetimerbot.onrender.com/8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8
+WEBHOOK_URL = "https://lifetimerbot.onrender.com/8312401636:AAGfQXDN5v5in2d4jUHMZZdTJYt29TfF3I8"
 bot.set_webhook(url=WEBHOOK_URL)
+
 
 # ---------- ЗАПУСК FLASK ----------
 if __name__ == '__main__':
