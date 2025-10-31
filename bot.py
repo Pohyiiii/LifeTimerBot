@@ -1,5 +1,5 @@
 import telebot
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from PIL import Image, ImageDraw, ImageFont
 import os
 import json
@@ -170,22 +170,18 @@ def save_users(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 users = load_users()
+awaiting_birth_date_change = set()  # пользователи, которые меняют дату
 
 # ---------- СОЗДАНИЕ КАРТИНКИ ----------
 def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80):
     total_weeks = life_expectancy_years * 52
     lived_weeks = (current_date - birth_date).days // 7
-    lived_days = (current_date - birth_date).days
-    remaining_weeks = total_weeks - lived_weeks
-    remaining_days = remaining_weeks * 7
-
     cols = 52
     rows = life_expectancy_years
     size = 10
     margin = 2
     left_space = 35
     top_space = 90
-
     img_width = cols * (size + margin) + margin + left_space + 20
     img_height = rows * (size + margin) + margin + top_space + 20
     img = Image.new("RGB", (img_width, img_height), "white")
@@ -198,8 +194,8 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
         font = ImageFont.load_default()
         title_font = ImageFont.load_default()
 
-    draw.text((10, 10), f"Прожито: {lived_weeks} недель ({lived_days} дней)", fill="black", font=title_font)
-    draw.text((10, 40), f"Осталось: {remaining_weeks} недель ({remaining_days} дней)", fill="gray", font=font)
+    draw.text((10, 10), f"Прожито: {lived_weeks} недель", fill="black", font=title_font)
+    draw.text((10, 40), f"Осталось: {total_weeks - lived_weeks} недель", fill="gray", font=font)
 
     for w in range(4, cols + 1, 4):
         x_pos = left_space + (w - 1) * (size + margin)
@@ -217,7 +213,7 @@ def generate_life_weeks_image(birth_date, current_date, life_expectancy_years=80
 
     return img
 
-# ---------- ОСНОВНАЯ ЛОГИКА ----------
+# ---------- СТАРТ / МЕНЮ ----------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = types.InlineKeyboardMarkup()
@@ -239,34 +235,65 @@ def set_life_expectancy(call):
     users[user_id]["life_expectancy"] = years
     save_users(users)
     bot.answer_callback_query(call.id, f"Выбрано: {years} лет")
-    bot.send_message(call.message.chat.id, "Отлично! Теперь отправь дату рождения в формате: ДД.ММ.ГГГГ")
+    bot.send_message(call.message.chat.id, "Отлично! Теперь отправь дату рождения в формате: ДД.MM.ГГГГ")
 
-@bot.message_handler(func=lambda message: True)
-def send_life_image(message):
+# ---------- ИЗМЕНЕНИЕ ДАТЫ ----------
+@bot.message_handler(func=lambda message: message.text == "📅 Изменить дату")
+def change_birth_date_request(message):
     user_id = str(message.from_user.id)
-    try:
-        birth_date = datetime.strptime(message.text, "%d.%m.%Y").date()
-        current_date = date.today()
-        years = users.get(user_id, {}).get("life_expectancy", 80)
+    awaiting_birth_date_change.add(user_id)
+    bot.send_message(message.chat.id, "Отправь новую дату рождения в формате: ДД.MM.ГГГГ")
 
-        users[user_id]["birth_date"] = birth_date.isoformat()
-        save_users(users)
+# ---------- ОБРАБОТКА СООБЩЕНИЙ ----------
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    user_id = str(message.from_user.id)
 
-        img = generate_life_weeks_image(birth_date, current_date, years)
-        img.save("life.png")
+    # Если пользователь меняет дату
+    if user_id in awaiting_birth_date_change:
+        try:
+            new_birth_date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            if user_id not in users:
+                users[user_id] = {}
+            users[user_id]["birth_date"] = new_birth_date.isoformat()
+            save_users(users)
+            awaiting_birth_date_change.remove(user_id)
+            bot.send_message(message.chat.id, f"Дата рождения обновлена: {message.text}")
 
-        quote = random.choice(quotes)
-        with open("life.png", "rb") as photo:
-            bot.send_photo(
-                message.chat.id,
-                photo,
-                caption=f"{quote}\n\nВот твоя жизнь в неделях (расчёт до {years} лет) 🕰"
-            )
+            years = users[user_id].get("life_expectancy", 80)
+            img = generate_life_weeks_image(new_birth_date, date.today(), years)
+            img.save("life.png")
+            with open("life.png", "rb") as photo:
+                bot.send_photo(message.chat.id, photo, caption=f"Вот твоя жизнь в неделях (расчёт до {years} лет) 🕰")
+        except ValueError:
+            bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.MM.ГГГГ")
+        return
 
-    except ValueError:
-        bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.ММ.ГГГГ")
+    # Если дата ещё не указана
+    if "birth_date" not in users.get(user_id, {}):
+        try:
+            birth_date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            if user_id not in users:
+                users[user_id] = {}
+            users[user_id]["birth_date"] = birth_date.isoformat()
+            save_users(users)
 
-# ---------- ПЛАНИРОВЩИК (еженедельное обновление) ----------
+            years = users[user_id].get("life_expectancy", 80)
+            img = generate_life_weeks_image(birth_date, date.today(), years)
+            img.save("life.png")
+            quote = random.choice(quotes)
+            with open("life.png", "rb") as photo:
+                bot.send_photo(message.chat.id, photo, caption=f"{quote}\n\nВот твоя жизнь в неделях 🕰")
+        except ValueError:
+            bot.reply_to(message, "⚠️ Пожалуйста, введи дату в формате ДД.MM.ГГГГ")
+        return
+
+    # Если дата уже есть — показываем главное меню
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton("📅 Изменить дату"))
+    bot.send_message(user_id, "Вы можешь изменить дату рождения через меню:", reply_markup=markup)
+
+# ---------- ПЛАНИРОВЩИК ----------
 def send_weekly_updates():
     today = date.today()
     print("🔔 Еженедельная рассылка запущена", datetime.now())
