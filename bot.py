@@ -188,6 +188,7 @@ def set_life_expectancy(call):
 
 # ---------- ОБРАБОТКА СООБЩЕНИЙ (ДРУЖЕЛЮБНАЯ) ----------
 @bot.message_handler(func=lambda message: True)
+@bot.message_handler(func=lambda message: True)
 def handle_message(message):
     user_id = str(message.from_user.id)
     text = message.text.strip()
@@ -206,12 +207,9 @@ def handle_message(message):
             img.save("life.png")
             quote = random.choice(quotes)
             with open("life.png", "rb") as photo:
-                bot.send_photo(
-                    message.chat.id,
-                    photo,
-                    caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
-                    reply_markup=main_reply_keyboard()
-                )
+                bot.send_photo(message.chat.id, photo,
+                               caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
+                               reply_markup=main_reply_keyboard())
         except ValueError:
             bot.reply_to(message, "⚠️ Введи дату в формате ДД.MM.ГГГГ")
         return
@@ -238,26 +236,8 @@ def handle_message(message):
         for y in [70, 80, 90]:
             markup_inline.add(types.InlineKeyboardButton(f"{y} лет", callback_data=f"years_{y}"))
         bot.send_message(message.chat.id, "Выбери предполагаемую продолжительность жизни:", reply_markup=markup_inline)
-    else:
-        # Проверяем, может это дата
-        try:
-            birth_date = datetime.strptime(text, "%d.%m.%Y").date()
-            users.setdefault(user_id, {})
-            users[user_id]["birth_date"] = birth_date.isoformat()
-            years = users[user_id].get("life_expectancy", 80)
-            save_users(users)
-            img = generate_life_weeks_image(birth_date, date.today(), years)
-            img.save("life.png")
-            quote = random.choice(quotes)
-            with open("life.png", "rb") as photo:
-                bot.send_photo(message.chat.id, photo,
-                               caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
-                               reply_markup=main_reply_keyboard())
-        except ValueError:
-            # Если это не дата и не кнопка — один раз выводим подсказку
-            bot.send_message(message.chat.id,
-                             "⚠️ Пожалуйста, отправь дату рождения в формате ДД.MM.ГГГГ или используй кнопки")
 
+    # Всё остальное игнорируем — бот больше ничего не пишет
 
 
 # ---------- FLASK ----------
