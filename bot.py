@@ -113,10 +113,17 @@ def generate_life_months_image(birth_date, current_date, life_expectancy_years=8
     remaining_months = total_months - lived_months
     draw.text((10, 30), f"Осталось: {remaining_months} месяцев", fill="gray", font=font)
 
+    # рисуем цифры месяцев сверху
+    for m in range(1, 13):
+        x_pos = left_space + (m - 1) * (size + margin)
+        draw.text((x_pos + 5, top_space - 18), str(m), fill="gray", font=font)
+
+    # рисуем цифры лет слева
     for y in range(rows):
         y_pos = top_space + y * (size + margin) - 2
         draw.text((10, y_pos), str(y + 1), fill="gray", font=font)
 
+    # рисуем прямоугольники
     for i in range(total_months):
         x = left_space + (i % cols) * (size + margin)
         y = top_space + (i // cols) * (size + margin)
@@ -124,6 +131,7 @@ def generate_life_months_image(birth_date, current_date, life_expectancy_years=8
         draw.rectangle([x, y, x + size, y + size], fill=color)
 
     return img
+
 
 # ---------- ФУНКЦИЯ ДЛЯ ПАНЕЛИ ВВОДА ----------
 def main_reply_keyboard():
@@ -154,7 +162,23 @@ def set_life_expectancy(call):
     users[user_id]["life_expectancy"] = years
     save_users(users)
     bot.answer_callback_query(call.id, f"Выбрано: {years} лет")
-    bot.send_message(call.message.chat.id, f"Отлично! Теперь отправь дату рождения в формате: ДД.MM.ГГГГ")
+
+    # проверяем, есть ли уже дата рождения
+    if "birth_date" in users[user_id]:
+        birth_date = datetime.fromisoformat(users[user_id]["birth_date"]).date()
+        img = generate_life_weeks_image(birth_date, date.today(), years)
+        img.save("life.png")
+        quote = random.choice(quotes)
+        with open("life.png", "rb") as photo:
+            bot.send_photo(
+                call.message.chat.id,
+                photo,
+                caption=f"{quote}\n\nВот твоя жизнь в неделях (до {years} лет) 🕰",
+                reply_markup=main_reply_keyboard()
+            )
+    else:
+        bot.send_message(call.message.chat.id, "Отлично! Теперь отправь дату рождения в формате: ДД.MM.ГГГГ")
+
 
 # ---------- ОБРАБОТКА СООБЩЕНИЙ ----------
 @bot.message_handler(func=lambda message: True)
