@@ -338,24 +338,48 @@ def daily_update():
     for user_id, info in users.items():
         if "birth_date" not in info:
             continue
+
         birth_date = datetime.fromisoformat(info["birth_date"]).date()
         years = info.get("life_expectancy", 80)
+        lived_weeks = (today - birth_date).days // 7
 
-        img = generate_life_weeks_image(birth_date, today, years)
-        filename = f"life_{user_id}.png"
-        img.save(filename)
+        # Проверяем, отправляли ли уже на этой неделе
+        last_sent_week = info.get("last_sent_week", -1)
+        if lived_weeks > last_sent_week:
+            img = generate_life_weeks_image(birth_date, today, years)
+            filename = f"life_{user_id}.png"
+            img.save(filename)
 
-        # ДР
+            message = random.choice(weekly_phrases)
+            quote = random.choice(quotes)
+            with open(filename, "rb") as photo:
+                bot.send_photo(
+                    user_id,
+                    photo,
+                    caption=f"{message}\n\n{quote}\n\nВот обновлённая таблица за {lived_weeks} недель 🕰"
+                )
+
+            info["last_sent_week"] = lived_weeks
+            save_users(users)
+
+        # День рождения
         if birth_date.day == today.day and birth_date.month == today.month:
+            img = generate_life_weeks_image(birth_date, today, years)
+            filename = f"life_{user_id}_bday.png"
+            img.save(filename)
             message = random.choice(birthday_messages)
             with open(filename, "rb") as photo:
                 bot.send_photo(user_id, photo, caption=message)
 
         # Новый год
         if today.month == 1 and today.day == 1:
-            message = random.choice(new_year_messages)
+            img = generate_life_weeks_image(birth_date, today, years)
+            filename = f"life_{user_id}_ny.png"
+            img.save(filename)
+            message = random.choice(newyear_messages)
             with open(filename, "rb") as photo:
                 bot.send_photo(user_id, photo, caption=message)
+
 
 scheduler.add_job(daily_update, 'cron', hour=9, minute=0)  # каждый день в 9:00
 scheduler.start()
