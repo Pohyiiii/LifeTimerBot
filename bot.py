@@ -330,6 +330,10 @@ def webhook():
     bot.process_new_updates([update])
     return '', 200
 
+@app.route('/ping', methods=['GET'])
+def ping():
+    return "pong", 200
+
 # ---------- ПЛАНИРОВЩИК ----------
 scheduler = BackgroundScheduler(timezone=pytz.timezone(TIMEZONE))
 
